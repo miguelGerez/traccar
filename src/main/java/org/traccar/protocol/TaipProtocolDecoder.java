@@ -192,7 +192,7 @@ public class TaipProtocolDecoder extends BaseProtocolDecoder {
             position.setLongitude(parser.nextCoordinate(Parser.CoordinateFormat.HEM_DEG_MIN));
         }
 
-        position.setSpeed(UnitsConverter.knotsFromMph(parser.nextDouble(0)));
+        position.setSpeed(UnitsConverter.knotsFromKph(parser.nextDouble(0)));
         position.setCourse(parser.nextDouble(0));
 
         if (parser.hasNext(2)) {
@@ -315,8 +315,8 @@ public class TaipProtocolDecoder extends BaseProtocolDecoder {
                     if (messageIndex.startsWith("#IP")) {
                         response = ">SAK;ID=" + uniqueId + ";" + messageIndex + "<";
                     } else {
-                        response = ">ACK;ID=" + uniqueId + ";" + messageIndex + ";*";
-                        response += String.format("%02X", Checksum.xor(response)) + "<";
+                        response = ">ACK;ID=" + uniqueId + ";" + messageIndex + ";";
+                        response += "*" + String.format("%02X", Checksum.xor(response)) + "<CR LF";
                     }
                     channel.writeAndFlush(new NetworkMessage(response, remoteAddress));
                 } else {
