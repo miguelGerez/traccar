@@ -28,6 +28,7 @@ import org.traccar.Protocol;
 import org.traccar.helper.BcdUtil;
 import org.traccar.helper.BitUtil;
 import org.traccar.helper.DateBuilder;
+import org.traccar.helper.ObdDecoder;
 import org.traccar.helper.UnitsConverter;
 import org.traccar.model.CellTower;
 import org.traccar.model.Network;
@@ -61,6 +62,7 @@ public class T800xProtocolDecoder extends BaseProtocolDecoder {
     public static final int MSG_NETWORK = 0x05; // 0x2727
     public static final int MSG_DRIVER_BEHAVIOR_1 = 0x05; // 0x2626
     public static final int MSG_DRIVER_BEHAVIOR_2 = 0x06; // 0x2626
+    public static final int MSG_DTC = 0x09; // 0x2626
     public static final int MSG_BLE = 0x10;
     public static final int MSG_NETWORK_2 = 0x11;
     public static final int MSG_GPS_2 = 0x13;
@@ -241,6 +243,10 @@ public class T800xProtocolDecoder extends BaseProtocolDecoder {
 
             return position;
 
+        } else if (type == MSG_DTC && header == 0x2626) {
+
+            return decodeDtc(deviceSession, buf);
+
         } else if (type == MSG_BLE) {
 
             return decodeBle(channel, deviceSession, buf, type, index, imei);
@@ -261,6 +267,43 @@ public class T800xProtocolDecoder extends BaseProtocolDecoder {
         }
 
         return null;
+    }
+
+    private Position decodeDtc(DeviceSession deviceSession, ByteBuf buf) {
+
+        Position position = new Position(getProtocolName());
+        position.setDeviceId(deviceSession.getDeviceId());
+
+        getLastLocation(position, readDate(buf));
+
+        while (buf.readableBytes() >= 10 && buf.getUnsignedShort(buf.readerIndex()) == 0x55aa) {
+            buf.skipBytes(2); // content header
+            int length = BitUtil.to(buf.readUnsignedShort(), 12);
+            int end = buf.readerIndex() + length;
+            if (length < 3 || end + 2 > buf.writerIndex()) {
+                break;
+            }
+            switch (buf.readUnsignedShort()) {
+                case 0x410a -> {
+                    buf.readUnsignedByte(); // sae standard
+                    List<String> codes = new LinkedList<>();
+                    while (buf.readerIndex() < end - 1) {
+                        codes.add(ObdDecoder.decodeCode(buf.readUnsignedShort()));
+                        buf.readUnsignedByte(); // status
+                    }
+                    position.set(Position.KEY_DTCS, String.join(" ", codes));
+                }
+                case 0x4105 -> {
+                    ByteBuf vin = buf.readSlice(end - 1 - buf.readerIndex());
+                    if (vin.getUnsignedByte(vin.readerIndex()) != 0xff) {
+                        position.set(Position.KEY_VIN, vin.toString(StandardCharsets.US_ASCII));
+                    }
+                }
+            }
+            buf.readerIndex(end + 2); // content end
+        }
+
+        return position;
     }
 
     private double decodeBleTemp(ByteBuf buf) {
