@@ -372,7 +372,10 @@ public class T800xProtocolDecoder extends BaseProtocolDecoder {
             buf.readUnsignedByte(); // gsensor manager status
             buf.readUnsignedByte(); // other flags
             buf.readUnsignedByte(); // heartbeat
-            buf.readUnsignedByte(); // relay status
+            int relay = buf.readUnsignedByte();
+            if (header == 0x2626) {
+                position.set(Position.KEY_BLOCKED, BitUtil.check(relay, 6));
+            }
             buf.readUnsignedShort(); // drag alarm setting
 
             int io = buf.readUnsignedShort();
@@ -380,6 +383,10 @@ public class T800xProtocolDecoder extends BaseProtocolDecoder {
             position.set("ac", BitUtil.check(io, 13));
             position.set(Position.PREFIX_IN + 3, BitUtil.check(io, 12));
             position.set(Position.PREFIX_IN + 4, BitUtil.check(io, 11));
+            if (header == 0x2626) {
+                position.set(Position.KEY_CHARGE, !BitUtil.check(io, 15)); // external power cut
+                position.set(Position.PREFIX_IN + 5, BitUtil.check(io, 10));
+            }
 
             if (type == MSG_GPS_2 || type == MSG_ALARM_2) {
                 position.set(Position.KEY_OUTPUT, buf.readUnsignedByte());
@@ -425,7 +432,10 @@ public class T800xProtocolDecoder extends BaseProtocolDecoder {
             position.setLongitude(buf.readFloatLE());
             position.setLatitude(buf.readFloatLE());
             if (header == 0x2626) {
-                buf.readUnsignedShort(); // reserved or hdop
+                int hdop = buf.readUnsignedShort();
+                if (hdop > 0) {
+                    position.set(Position.KEY_HDOP, hdop / 100.0);
+                }
             } else {
                 position.setSpeed(UnitsConverter.knotsFromKph(BcdUtil.readInteger(buf, 4) / 10.0));
             }

@@ -11,6 +11,10 @@ public class T800xProtocolDecoderTest extends ProtocolTest {
 
         var decoder = inject(new T800xProtocolDecoder(null));
 
+        verifyAttribute(decoder, binary(
+                "262602005330c90863257069370825001902581e00000041eac0200500000080040000001b5a378026090822321100000000a91f74c2ca020cc2000100000000000000000000ffffffffffffffffffffffffff"),
+                Position.KEY_CHARGE, false);
+
         verifyPositions(decoder, false, binary(
                 "26260500400406086961606257315205250513182132ffffffffffffffffffffffff0000ffff0000250513182137ffffffffffffffffffffffff0770ffff0aec"));
 
